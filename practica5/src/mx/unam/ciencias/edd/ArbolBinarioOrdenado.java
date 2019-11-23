@@ -1,0 +1,340 @@
+package mx.unam.ciencias.edd;
+
+import java.util.Iterator;
+
+/**
+ * <p>Clase para árboles binarios ordenados. Los árboles son genéricos, pero
+ * acotados a la interfaz {@link Comparable}.</p>
+ *
+ * <p>Un árbol instancia de esta clase siempre cumple que:</p>
+ * <ul>
+ *   <li>Cualquier elemento en el árbol es mayor o igual que todos sus
+ *       descendientes por la izquierda.</li>
+ *   <li>Cualquier elemento en el árbol es menor o igual que todos sus
+ *       descendientes por la derecha.</li>
+ * </ul>
+ */
+public class ArbolBinarioOrdenado<T extends Comparable<T>>
+    extends ArbolBinario<T> {
+
+    /* Clase privada para iteradores de árboles binarios ordenados. */
+    private class Iterador implements Iterator<T> {
+
+        /* Pila para emular la pila de ejecución. */
+        private Pila<ArbolBinario<T>.Vertice> pila;
+        
+        /* Construye un iterador con el vértice recibido. */
+        public Iterador(ArbolBinario<T>.Vertice vertice) {
+            pila = new Pila<ArbolBinario<T>.Vertice>();
+            if(vertice != null)
+                hijo(vertice);
+        }
+
+        /* Nos dice si hay un siguiente elemento. */
+        @Override public boolean hasNext() {
+            return !pila.esVacia();
+        }
+
+        /* Regresa el siguiente elemento del árbol en orden. */
+        @Override public T next() {
+            ArbolBinario<T>.Vertice v = pila.saca();
+            hijo(v.derecho);
+            return v.elemento;
+        }
+
+        /* No lo implementamos: siempre lanza una excepción. */
+        @Override public void remove() {
+            throw new UnsupportedOperationException();
+        }
+
+        private void hijo(ArbolBinario<T>.Vertice v){
+            while(v != null){
+                pila.mete(v);
+                v = v.izquierdo;
+            }
+        }
+    }
+
+    /**
+     * Constructor sin parámetros. Sencillamente ejecuta el constructor sin
+     * parámetros de {@link ArbolBinario}.
+     */
+    public ArbolBinarioOrdenado() { super(); }
+
+    /**
+     * Construye un árbol binario ordenado a partir de un árbol binario. El
+     * árbol binario ordenado tiene los mismos elementos que el árbol recibido,
+     * pero ordenados.
+     * @param arbol el árbol binario a partir del cuál creamos el
+     *        árbol binario ordenado.
+     */
+    public ArbolBinarioOrdenado(ArbolBinario<T> arbol) {
+        super();
+        if(arbol.elementos == 0) return;
+        Cola<Vertice> cola = new Cola<Vertice>();
+        cola.mete(arbol.raiz);
+
+        while(!cola.esVacia()){
+            Vertice v = cola.saca();
+            if(v.izquierdo != null)
+                cola.mete(v.izquierdo);
+            if(v.derecho != null)
+                cola.mete(v.derecho);
+            this.agrega(v.elemento);
+        }
+    }
+
+    /**
+     * Agrega un nuevo elemento al árbol. El árbol conserva su orden in-order.
+     * @param elemento el elemento a agregar.
+     */
+    @Override public void agrega(T elemento) {
+        if(this.raiz == null) {
+            this.raiz = nuevoVertice(elemento);
+            this.elementos++;
+            ultimoAgregado = this.raiz;
+            return;
+        }
+        agrega(this.raiz,elemento);
+    }
+
+    private void agrega(Vertice v, T elemento){
+        Vertice nuevo = nuevoVertice(elemento);
+        ultimoAgregado = nuevo;
+        
+
+        if(elemento.compareTo(v.elemento) < 0){
+            if(v.izquierdo == null){
+                insertaIzq(v,nuevo);
+                this.elementos++;
+            }
+            else
+                agrega(v.izquierdo, elemento);
+            return;
+        }
+
+        if(elemento.compareTo(v.elemento) >=0){
+            if(v.derecho == null){
+                insertaDer(v,nuevo);
+                this.elementos++;
+            }
+            else
+                agrega(v.derecho,elemento);
+            return;
+        } 
+    }
+
+    /**
+     * Elimina un elemento. Si el elemento no está en el árbol, no hace nada; si
+     * está varias veces, elimina el primero que encuentre (in-order). El árbol
+     * conserva su orden in-order.
+     * @param elemento el elemento a eliminar.
+     */
+    @Override public void elimina(T elemento) {
+        if(this.raiz == null) return;
+        elimina(this.raiz,elemento);
+    }
+
+    private void elimina(Vertice v, T elemento){
+        Vertice p = busca(v, elemento);
+        if(p == null)
+            return;
+        if(p.izquierdo == null && p.derecho == null){
+            if(p.padre == null)
+                this.raiz = null;
+            if(esIzquierdo(p))
+                p.padre.izquierdo = null;
+            if(esDerecho(p))
+                p.padre.derecho = null;
+            p.padre = null;
+            this.elementos--;
+            if(this.raiz != null)
+                this.raiz.padre = null;
+            return;
+        }
+        if(p.izquierdo != null && p.derecho == null){
+            if(p.padre == null)
+                this.raiz = p.izquierdo;
+            if(esIzquierdo(p))
+                insertaIzq(p.padre,p.izquierdo);
+            if(esDerecho(p))
+                insertaDer(p.padre, p.izquierdo);
+            p.padre = null;
+            p.derecho = null;
+            this.elementos--;
+            this.raiz.padre = null;
+            return;
+        }
+        if(p.izquierdo == null && p.derecho != null){
+            if(p.padre == null)
+                this.raiz = p.derecho;
+            if(esIzquierdo(p))
+                insertaIzq(p.padre,p.derecho);
+            if(esDerecho(p))
+                insertaDer(p.padre, p.derecho);
+            p.padre = null;
+            p.derecho = null;
+            this.elementos--;
+            this.raiz.padre = null;
+            return;
+        }
+        if(p.izquierdo != null && p.derecho != null){
+            Vertice reemplazo = maximoEnSubarbol(p.izquierdo);
+            p.elemento = reemplazo.elemento;
+            elimina(p.izquierdo, p.elemento);
+            return;
+        }
+
+    }
+    
+    private boolean esIzquierdo(Vertice v){
+        if(v.padre == null)
+            return false;
+        return v.padre.izquierdo == v;
+    }
+
+    private boolean esDerecho(Vertice v){
+        if(v.padre == null)
+            return false;
+        return v.padre.derecho == v;
+    }
+
+    private void insertaIzq(Vertice p, Vertice h){
+        p.izquierdo = h;
+        h.padre = p;
+    }
+    private void insertaDer(Vertice p, Vertice h){
+        p.derecho = h;
+        h.padre = p;
+    }
+
+    /**
+     * Nos dice si un elemento está contenido en el árbol.
+     * @param elemento el elemento que queremos ver si está en el árbol.
+     * @return <code>true</code> si el elemento está contenido en el árbol,
+     *         <code>false</code> en otro caso.
+     */
+    @Override public boolean contiene(T elemento) {
+        return busca(elemento)!= null;
+    }
+
+    /**
+     * Busca un elemento en el árbol recorriéndolo in-order. Si lo encuentra,
+     * regresa el vértice que lo contiene; si no, regresa <tt>null</tt>.
+     * @param elemento el elemento a buscar.
+     * @return un vértice que contiene al elemento buscado si lo
+     *         encuentra; <tt>null</tt> en otro caso.
+     */
+    @Override public VerticeArbolBinario<T> busca(T elemento) {
+        return busca(this.raiz, elemento);
+    }
+
+    /**
+     * Busca recursivamente un elemento, a partir del vértice recibido.
+     * @param vertice el vértice a partir del cuál comenzar la búsqueda. Puede
+     *                ser <code>null</code>.
+     * @param elemento el elemento a buscar a partir del vértice.
+     * @return el vértice que contiene el elemento a buscar, si se encuentra en
+     *         el árbol; <code>null</code> en otro caso.
+     */
+    @Override protected Vertice busca(Vertice vertice, T elemento) {
+         if(vertice == null || elemento.equals(vertice.elemento))
+            return vertice;
+        if(elemento.compareTo(vertice.elemento) < 0)
+            return busca(vertice.izquierdo, elemento);
+        if(elemento.compareTo(vertice.elemento) > 0)
+            return busca(vertice.derecho, elemento);
+        return null;
+    }
+
+    /**
+     * Regresa el vértice máximo en el subárbol cuya raíz es el vértice que
+     * recibe.
+     * @param vertice el vértice raíz del subárbol del que queremos encontrar el
+     *                máximo.
+     * @return el vértice máximo el subárbol cuya raíz es el vértice que recibe.
+     */
+    protected Vertice maximoEnSubarbol(Vertice vertice) {
+        if(vertice == null)
+            return null;
+        if(vertice.derecho == null)
+            return vertice;
+        return maximoEnSubarbol(vertice.derecho);
+    }
+
+    /**
+     * Regresa un iterador para iterar el árbol. El árbol se itera en orden.
+     * @return un iterador para iterar el árbol.
+     */
+    @Override public Iterator<T> iterator() {
+        return new Iterador(raiz);
+    }
+
+    /**
+     * Gira el árbol a la derecha sobre el vértice recibido. Si el vértice no
+     * tiene hijo izquierdo, el método no hace nada.
+     * @param vertice el vértice sobre el que vamos a girar.
+     */
+    public void giraDerecha(VerticeArbolBinario<T> vertice) {
+        Vertice v = vertice(vertice);
+        giraDerecha(v);
+    }
+
+    /* Gira el árbol a la derecha sobre el vértice recibido. */
+    private void giraDerecha(Vertice vertice) {
+        if(vertice.izquierdo == null)
+            return;
+        Vertice hijoP = vertice.izquierdo.derecho;
+        Vertice padreVertice = vertice.padre;
+        Vertice reemplazo = vertice.izquierdo;
+
+        if(esIzquierdo(vertice))
+            insertaIzq(vertice.padre, reemplazo);
+        if(esDerecho(vertice))
+            insertaDer(vertice.padre, reemplazo);
+        if(padreVertice == null){
+            this.raiz = reemplazo;
+            reemplazo.padre = null;
+        }
+
+        reemplazo.derecho = vertice;
+        vertice.izquierdo = hijoP;
+        vertice.padre = reemplazo;
+        if(hijoP != null)
+            hijoP.padre = vertice;
+    }
+
+    /**
+     * Gira el árbol a la izquierda sobre el vértice recibido. Si el vértice no
+     * tiene hijo derecho, el método no hace nada.
+     * @param vertice el vértice sobre el que vamos a girar.
+     */
+    public void giraIzquierda(VerticeArbolBinario<T> vertice) {
+        Vertice v = vertice(vertice);
+        giraIzquierda(v);
+    }
+
+    /* Gira el árbol a la izquierda sobre el vértice recibido. */
+    private void giraIzquierda(Vertice vertice) {
+        if(vertice.derecho == null)
+            return;
+        Vertice hijoP = vertice.derecho.izquierdo;
+        Vertice padreVertice = vertice.padre;
+        Vertice reemplazo = vertice.derecho;
+
+        if(esIzquierdo(vertice))
+            insertaIzq(vertice.padre, reemplazo);
+        if(esDerecho(vertice))
+            insertaDer(vertice.padre, reemplazo);
+        if(padreVertice == null){
+            this.raiz = reemplazo;
+            reemplazo.padre = null;
+        }
+
+        reemplazo.izquierdo = vertice;
+        vertice.derecho = hijoP;
+        vertice.padre = reemplazo;
+        if(hijoP != null)
+            hijoP.padre = vertice;
+    }
+}
